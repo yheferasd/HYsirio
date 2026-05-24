@@ -2297,23 +2297,23 @@
   <div class="payment-inner">
     <div class="payment-label">Medios de pago aceptados</div>
     <div class="payment-logos">
-      <div class="payment-logo">
+      <div class="payment-logo" style="cursor:pointer" onclick="window.open('https://wa.me/51984303613?text=Hola%20HYSIRIO%2C%20me%20gustar%C3%ADa%20consultar%20sobre%20el%20pago%20con%20Visa', '_blank')">
         <span class="pay-visa">VISA</span>
       </div>
-      <div class="payment-logo">
+      <div class="payment-logo" style="cursor:pointer" onclick="window.open('https://wa.me/51984303613?text=Hola%20HYSIRIO%2C%20me%20gustar%C3%ADa%20consultar%20sobre%20el%20pago%20con%20Mastercard', '_blank')">
         <div class="pay-mc">
           <div class="mc-left"></div>
           <div class="mc-right"></div>
         </div>
         <span style="font-size:13px;font-weight:600;color:#555;margin-left:6px">Mastercard</span>
       </div>
-      <div class="payment-logo">
+      <div class="payment-logo" style="cursor:pointer" onclick="window.open('https://wa.me/51984303613?text=Hola%20HYSIRIO%2C%20me%20gustar%C3%ADa%20consultar%20sobre%20el%20pago%20con%20PayPal', '_blank')">
         <span class="pay-paypal">Pay<span>Pal</span></span>
       </div>
-      <div class="payment-logo">
+      <div class="payment-logo" style="cursor:pointer" onclick="window.open('https://wa.me/51984303613?text=Hola%20HYSIRIO%2C%20me%20gustar%C3%ADa%20consultar%20sobre%20el%20pago%20con%20Yape', '_blank')">
         <span class="pay-yape">📱 Yape</span>
       </div>
-      <div class="payment-logo">
+      <div class="payment-logo" style="cursor:pointer" onclick="window.open('https://wa.me/51984303613?text=Hola%20HYSIRIO%2C%20me%20gustar%C3%ADa%20consultar%20sobre%20el%20pago%20con%20AMEX', '_blank')">
         <span class="pay-amex">AMEX</span>
       </div>
     </div>
@@ -2407,6 +2407,13 @@
         <ul class="modal-features" id="modalFeatures"></ul>
 
         <div class="modal-payment-section">
+          <span class="modal-payment-title">Cantidad</span>
+          <div class="cart-item-qty" style="margin-bottom: 20px; justify-content: flex-start;">
+            <button class="qty-btn" onclick="updateModalQty(-1)">-</button>
+            <span id="modalQty">1</span>
+            <button class="qty-btn" onclick="updateModalQty(1)">+</button>
+          </div>
+          
           <span class="modal-payment-title">Métodos de Pago</span>
           <div class="payment-btns-grid">
             <button class="payment-btn" onclick="sendWhatsApp('Yape')">
@@ -2424,7 +2431,7 @@
           </div>
         </div>
 
-        <button class="modal-cta" onclick="addToCart(currentProductId)">
+        <button class="modal-cta" onclick="addToCart(currentProductId, currentModalQty)">
           <i class="fas fa-shopping-bag" style="margin-right:8px"></i> Agregar al Carrito
         </button>
       </div>
@@ -2551,11 +2558,19 @@
   };
 
   let currentProductId = null;
+  let currentModalQty = 1;
+
+  function updateModalQty(delta) {
+    currentModalQty = Math.max(1, currentModalQty + delta);
+    document.getElementById('modalQty').textContent = currentModalQty;
+  }
 
   function openModal(id) {
     const p = products[id];
     if (!p) return;
     currentProductId = id;
+    currentModalQty = 1;
+    document.getElementById('modalQty').textContent = currentModalQty;
     document.getElementById('modalImg').src = p.img;
     document.getElementById('modalCategory').textContent = p.category;
     document.getElementById('modalTitle').textContent = p.title;
@@ -2565,13 +2580,21 @@
     featEl.innerHTML = p.features.map(f => `<li><i class="fas fa-check"></i> ${f}</li>`).join('');
     document.getElementById('modalOverlay').classList.add('active');
     document.body.style.overflow = 'hidden';
+
+    // Push state for navigation
+    history.pushState({ modal: true, productId: id }, "");
   }
 
   // FIX: función closeModal separada para reutilizar
-  function closeModal() {
+  function closeModal(isPopState = false) {
+    if (isPopState instanceof Event) isPopState = false;
     document.getElementById('modalOverlay').classList.remove('active');
     document.body.style.overflow = '';
     document.body.style.overflowX = 'hidden';
+    
+    if (!isPopState && history.state && history.state.modal) {
+      history.back();
+    }
   }
 
   // FIX: botón X usa addEventListener en lugar de onclick inline
@@ -2588,14 +2611,15 @@
   });
 
   function sendWhatsApp(method) {
-    if (!currentProduct) return;
+    const product = products[currentProductId];
+    if (!product) return;
     const phoneNumber = "51984303613";
     
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = currentProduct.price;
+    tempDiv.innerHTML = product.price;
     const priceText = tempDiv.textContent.replace(/\s+/g, ' ').trim();
 
-    const message = `Hola HYSIRIO, me gustaría adquirir el producto: *${currentProduct.title}*\n` +
+    const message = `Hola HYSIRIO, me gustaría adquirir el producto: *${product.title}*\n` +
                     `Precio: *${priceText}*\n` +
                     `Método de pago: *${method}*\n\n` +
                     `¿Me podrían confirmar la disponibilidad para concretar mi compra? ¡Gracias!`;
@@ -2606,10 +2630,29 @@
   // ===== CART LOGIC =====
   let cart = [];
 
-  function toggleCart() {
-    document.getElementById('cartOverlay').classList.toggle('active');
-    document.body.style.overflow = document.getElementById('cartOverlay').classList.contains('active') ? 'hidden' : '';
+  function toggleCart(isPopState = false) {
+    if (isPopState instanceof Event) isPopState = false;
+    const cartEl = document.getElementById('cartOverlay');
+    const isActive = cartEl.classList.toggle('active');
+    document.body.style.overflow = isActive ? 'hidden' : '';
+    
+    if (isActive) {
+      history.pushState({ cart: true }, "");
+    } else if (!isPopState && history.state && history.state.cart) {
+      history.back();
+    }
   }
+
+  window.addEventListener('popstate', (e) => {
+    // Si hay un modal activo, cerrarlo
+    if (document.getElementById('modalOverlay').classList.contains('active')) {
+      closeModal(true);
+    }
+    // Si el carrito está activo, cerrarlo
+    if (document.getElementById('cartOverlay').classList.contains('active')) {
+      toggleCart(true);
+    }
+  });
 
   document.querySelector('.cart-badge').addEventListener('click', (e) => {
     e.preventDefault();
@@ -2621,13 +2664,13 @@
     if (e.target.id === 'cartOverlay') toggleCart();
   });
 
-  function addToCart(id) {
+  function addToCart(id, qty = 1) {
     const product = products[id];
     if (!product) return;
 
     const existingItem = cart.find(item => item.id === id);
     if (existingItem) {
-      existingItem.qty++;
+      existingItem.qty += qty;
     } else {
       // Extraer precio numérico
       const tempDiv = document.createElement('div');
@@ -2640,7 +2683,7 @@
         title: product.title,
         price: price,
         img: product.img,
-        qty: 1
+        qty: qty
       });
     }
 
